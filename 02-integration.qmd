@@ -1,0 +1,107 @@
+---
+title: "Organoid integration"
+---
+
+# Introduction
+
+In this document we will perform integration of the two organoid samples.
+
+```{python}
+import lamindb as ln
+import lnschema_bionty as lb
+import scanpy as sc
+import anndata
+import scvi
+
+lb.settings.species = "human"
+
+transform = ln.Transform(name="Organoid_integration")
+ln.track(transform)
+```
+
+# Load Data
+
+## Organoid 123
+
+```{python}
+org123_file = ln.File.filter(key="Organoid123_qc.h5ad").one()
+org123 = org123_file.load()
+org123
+```
+
+## Organoid 4
+
+```{python}
+org4_file = ln.File.filter(key="Organoid4_qc.h5ad").one()
+org4 = org4_file.load()
+org4
+```
+
+# Unintegrated
+
+## Concatenate
+
+```{python}
+orgs = anndata.concat([org123, org4], merge="same")
+```
+
+## UMAP
+
+```{python}
+sc.pp.highly_variable_genes(
+    orgs,
+    flavor="cell_ranger",
+    n_top_genes=2000,
+    batch_key="Dataset"
+)
+sc.pp.pca(orgs)
+sc.pp.neighbors(orgs)
+sc.tl.umap(orgs)
+
+sc.pl.umap(orgs, color="Dataset")
+```
+
+# Prepare
+
+```{python}
+scvi_adata = orgs[:, orgs.var.highly_variable].copy()
+
+scvi.model.SCVI.setup_anndata(
+    scvi_adata,
+    layer="counts",
+    batch_key="Dataset",
+)
+
+scvi_adata
+```
+
+# Train
+
+```{python}
+model = scvi.model.SCVI(scvi_adata)
+print(model)
+model.train(max_epochs=100)
+```
+
+# Integrated
+
+```{python}
+orgs.obsm["X_scVI"] = model.get_latent_representation()
+orgs.obsm["X_umap_unintegrated"] = orgs.obsm["X_umap"].copy()
+
+sc.pp.neighbors(orgs, use_rep="X_scVI")
+sc.tl.umap(orgs)
+
+sc.pl.umap(orgs, color="Dataset")
+```
+
+# Save
+
+```{python}
+orgs_file = ln.File.from_anndata(
+    orgs,
+    field=lb.Gene.ensembl_gene_id,
+    key="Organoids_integrated.h5ad"
+)
+orgs_file.save()
+```
