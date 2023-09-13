@@ -1,0 +1,102 @@
+---
+title: "Organoids clustering"
+---
+
+# Introduction
+
+In this document we will perform clustering of the integrated organoids.
+
+```{python}
+import lamindb as ln
+import lnschema_bionty as lb
+import scanpy as sc
+import anndata
+
+lb.settings.species = "human"
+
+transform = ln.Transform(name="Organoid_clustering")
+ln.track(transform)
+```
+
+# Load Data
+
+```{python}
+orgs_file = ln.File.filter(key="Organoids_integrated.h5ad").one()
+orgs = orgs_file.load()
+orgs
+```
+
+# Cluster
+
+```{python}
+sc.tl.leiden(orgs, key_added="Cluster", resolution=0.2)
+sc.pl.umap(orgs, color="Cluster")
+```
+
+# Markers
+
+```{python}
+marker_symbols = [
+    "TAGLN", "ACTA2", "MGP", "MAB21L2", "CXCL14", "PRRX1", "PODXL", "NPHS2",
+    "TCF21", "DLK1", "GATA3", "IGFBP5", "HIST1H4C", # "PCLAF",
+    "TYMS", "CLDN5", "PECAM1", "KDR", "CENPF", "HMGB2", "UBE2C", "COL2A1", "COL9A3", # "CNMD",
+    "FABP7", "TTYH1", "SOX2", "PAX2", "PAX8", "KRT19", # "MYOG",
+    "MYOD1", "HES6", "STMN2", "GNG11", "CALM1"
+]
+
+sc.pl.dotplot(
+    orgs,
+    marker_symbols,
+    groupby="Cluster",
+    gene_symbols="gene_symbols"
+)
+```
+
+# Labels
+
+```{python}
+labels = [
+    "Stroma 1",
+    "Stroma 2",
+    "Stroma 3",
+    "Podocyte",
+    "Endothelium 1",
+    "Stroma 4",
+    "Epithelium",
+    "Glial",
+    "Endothelium 2",
+]
+orgs.obs["cell_type"] = orgs.obs["Cluster"].cat.rename_categories(labels)
+sc.pl.umap(orgs, color="cell_type", legend_loc="on data")
+```
+
+# Standard labels
+
+```{python}
+lb.CellType.inspect(orgs.obs.cell_type)
+
+celltype_bt = lb.CellType.bionty()
+ontology_ids = []
+mapper = {}
+for ct in orgs.obs.cell_type.unique():
+    ontology_id = celltype_bt.search(ct).iloc[0].ontology_id
+    record = lb.CellType.from_bionty(ontology_id=ontology_id)
+    mapper[ct] = record.name
+    record.save()
+    record.add_synonym(ct)
+
+# standardize cell type names in the dataset
+orgs.obs["standard_cell_type"] = orgs.obs.cell_type.map(mapper)
+sc.pl.umap(orgs, color="standard_cell_type", legend_loc="on data")
+```
+
+# Save
+
+```{python}
+out_file = ln.File.from_anndata(
+    orgs,
+    field=lb.Gene.ensembl_gene_id,
+    key="Organoids_clustered.h5ad"
+)
+out_file.save()
+```

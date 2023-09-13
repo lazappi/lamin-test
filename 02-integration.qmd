@@ -43,6 +43,7 @@ org4
 
 ```{python}
 orgs = anndata.concat([org123, org4], merge="same")
+orgs.var["gene_symbols"] = org123.var.loc[orgs.var_names.to_list()]["gene_symbols"]
 ```
 
 ## UMAP
