@@ -60,12 +60,14 @@ matrix_file = ln.File(matrix_path, key=matrix_path)
 
 print(f"Creating AnnData object...")
 adata = sc.read_10x_mtx(data_dir, var_names="gene_ids")
+adata.obs["Dataset"] = "Organoid4"
+adata.obs["Sample"] = [x.split("-")[1] for x in adata.obs_names.to_list()]
 print(adata)
 
 adata_file = ln.File.from_anndata(
     adata,
     field=lb.Gene.ensembl_gene_id,
-    key="Organoid4_raw"
+    key="Organoid4_raw.h5ad"
 )
 
 print(f"Saving AnnData object...")

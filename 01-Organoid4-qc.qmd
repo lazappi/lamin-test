@@ -1,0 +1,132 @@
+---
+title: "Organoid4 Quality Control"
+---
+
+# Introduction
+
+In this document we will perform quality control on the Organoid4 dataset using the thresholds from the original paper.
+
+```{python}
+import lamindb as ln
+import lnschema_bionty as lb
+import scanpy as sc
+
+lb.settings.species = "human"
+
+transform = ln.Transform(name="Organoid4_qc")
+ln.track(transform)
+```
+
+# Load Data
+
+```{python}
+file = ln.File.filter(key="Organoid4_raw.h5ad").one()
+adata = file.load()
+adata
+```
+
+# Prepare data
+
+Normalise, get HVGs, calculate embeddings, calculate QC stats.
+
+```{python}
+adata.layers["counts"] = adata.X.copy()
+sc.pp.normalize_total(adata, target_sum=1e4)
+sc.pp.log1p(adata)
+sc.pp.highly_variable_genes(adata)
+sc.pp.pca(adata)
+sc.pp.neighbors(adata)
+sc.tl.umap(adata)
+adata.var["MT"] = adata.var["gene_symbols"].str.startswith("MT-")
+sc.pp.calculate_qc_metrics(adata, layer="counts", qc_vars=["MT"], inplace=True)
+sc.pp.calculate_qc_metrics(adata, expr_type="expr", inplace=True)
+```
+
+# Plots
+
+Visualise QC metrics.
+
+## By cell
+
+Cell QC metrics
+
+### Total counts
+
+```{python}
+sc.pl.violin(adata, keys="total_counts", groupby="Sample")
+```
+
+### Features by total counts
+
+```{python}
+sc.pl.scatter(
+    adata,
+    x="total_counts",
+    y="n_genes_by_counts",
+    color="Sample",
+)
+```
+
+### PCA
+
+```{python}
+sc.pl.pca(adata, color=["Sample", "log1p_total_counts", "pct_counts_MT"])
+```
+
+### UMAP
+
+```{python}
+sc.pl.umap(adata, color=["Sample", "log1p_total_counts", "pct_counts_MT"])
+```
+
+### Mitochondrial genes
+
+```{python}
+sc.pl.violin(adata, keys="pct_counts_MT", groupby="Sample")
+```
+
+## By gene
+
+Gene QC metrics.
+
+### Dropout by mean
+
+```{python}
+sc.pl.scatter(adata, x="mean_expr", y="pct_dropout_by_counts")
+```
+
+### Counts by cells
+
+```{python}
+sc.pl.scatter(adata, x="n_cells_by_counts", y="log1p_total_counts")
+```
+
+# Filtering
+
+## Cells
+
+Filter cells using paper thresholds.
+
+```{python}
+filtered = (adata.obs["n_genes_by_counts"] > 9000) | (adata.obs["pct_counts_MT"] > 10)
+adata = adata[~ filtered, :].copy()
+```
+
+## Genes
+
+Filter genes with less than 1 count.
+
+```{python}
+sc.pp.filter_genes(adata, min_counts=1)
+```
+
+# Save
+
+```{python}
+qc_file = ln.File.from_anndata(
+    adata,
+    field=lb.Gene.ensembl_gene_id,
+    key="Organoid4_qc.h5ad"
+)
+qc_file.save()
+```
