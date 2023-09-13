@@ -1,0 +1,8 @@
+project:
+  title: "lamin-test"
+  output-dir: reports
+
+toc: true
+number-sections: true
+
+editor: source
