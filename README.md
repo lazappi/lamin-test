@@ -1,5 +1,7 @@
-# Re-analysis of kidney organoid data of Phipson19 using LaminDB
+# Re-analysis of Combes kidney organoid data using LaminDB
 
-This repository re-analyzes the data of [Phipson, _et al._ (2019), Nat Meth.](https://pubmed.ncbi.nlm.nih.gov/30573816/) using [LaminDB](https://lamin.ai/docs).
+This repository re-analyzes the data of [Combes et al. (2019), Genome Biology.](https://genomemedicine.biomedcentral.com/articles/10.1186/s13073-019-0615-0) to test [LaminDB](https://lamin.ai/docs).
 
-It consists in download scripts and a sequence of [Quarto](https://quarto.org/) notebooks.
+It consists of download scripts and a sequence of [Quarto](https://quarto.org/) notebooks.
+
+This is currently an initial proof-of-concept and the code is incomplete and unfinished.
